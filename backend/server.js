@@ -333,7 +333,7 @@ async function saveScore(score, username) {
     }
 }
 
-const PORT = 3001; // Use a different port for MEAN backend
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`MEAN Backend running on port ${PORT}`);
+    console.log(`Backend running on port ${PORT}`);
 });

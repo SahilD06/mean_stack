@@ -10,7 +10,7 @@ export class SocketService {
 
   constructor() {
     const host = window.location.hostname;
-    this.socket = io(`http://${host}:3001`);
+    this.socket = io(`https://project-backend-o8xj.onrender.com`);
   }
 
   emit(event: string, ...args: any[]) {
