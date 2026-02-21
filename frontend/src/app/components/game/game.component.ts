@@ -109,9 +109,7 @@ export class GameComponent implements OnInit, OnDestroy {
   loadLeaderboard(): void {
     if (!this.isSoloMode) return;
     this.leaderboardLoaded = false;
-    const host = window.location.hostname;
-    const port = 3001;
-    this.http.get<any[]>(`http://${host}:${port}/api/scores`).subscribe(
+    this.http.get<any[]>(`${this.socketService.baseUrl}/api/scores`).subscribe(
       (data) => {
         this.leaderboard = Array.isArray(data) ? data.map((s: any) => ({ name: s.name ?? 'Anonymous', score: s.score ?? 0 })) : [];
         this.leaderboardLoaded = true;

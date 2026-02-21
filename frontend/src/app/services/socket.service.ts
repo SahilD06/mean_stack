@@ -7,10 +7,10 @@ import { Observable } from 'rxjs';
 })
 export class SocketService {
   private socket: Socket;
+  public baseUrl: string = 'https://project-backend-o8xj.onrender.com';
 
   constructor() {
-    const host = window.location.hostname;
-    this.socket = io(`https://project-backend-o8xj.onrender.com`);
+    this.socket = io(this.baseUrl);
   }
 
   emit(event: string, ...args: any[]) {
