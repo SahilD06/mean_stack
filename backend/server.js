@@ -181,6 +181,17 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('endGameManual', (roomCode) => {
+        const room = rooms[roomCode];
+        if (room && room.gameState === 'playing') {
+            const player = room.players.find(p => p.socketId === socket.id);
+            if (player) {
+                console.log(`Manual end game requested by ${player.username} in room ${roomCode}`);
+                endGame(roomCode, player.id);
+            }
+        }
+    });
+
     socket.on('leaveRoom', (roomCode) => {
         const room = rooms[roomCode];
         if (!room) return;

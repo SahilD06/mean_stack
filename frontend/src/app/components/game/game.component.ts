@@ -186,6 +186,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   /** End Game from menu: show overlay with final scores, Home and Replay (don't navigate yet) */
   endGameFromMenu() {
+    this.socketService.emit('endGameManual', this.roomCode);
     this.showGameEndedByUser = true;
     this.isPaused = false;
   }
