@@ -1,0 +1,52 @@
+<div class="container">
+    <h1>Tetris Battle</h1>
+    <div class="menu">
+        <input type="text" [(ngModel)]="username" id="usernameInput" placeholder="YOUR NAME" maxlength="12">
+        <p class="menu-hint" style="margin: -4px 0 8px 0;">Up to 12 characters. 6-digit room code to join rooms.</p>
+
+        <!-- Single Player Section -->
+        <div class="menu-section">
+            <button class="btn btn-primary" (click)="toggleMenu('single')">SINGLE PLAYER</button>
+            <div class="sub-menu" [style.display]="activeMenu === 'single' ? 'flex' : 'none'">
+                <button class="btn btn-secondary" (click)="createRoom('solo', true)">PLAY WITH KEYBOARD</button>
+                <button class="btn btn-secondary" (click)="createRoom('solo', false)">PLAY ON PHONE</button>
+            </div>
+        </div>
+
+        <!-- Local Multiplayer: host displays all boards, no play; only controllers join -->
+        <div class="menu-section">
+            <button class="btn btn-primary" (click)="toggleMenu('local')">LOCAL MULTIPLAYER</button>
+            <div class="sub-menu" [style.display]="activeMenu === 'local' ? 'flex' : 'none'">
+                <p class="menu-hint">Host shows all boards. Only controllers join (no board on phone).</p>
+                <div class="menu-group">
+                    <button class="btn btn-secondary" (click)="createRoom('local', true)">HOST</button>
+                </div>
+                <div class="separator">OR</div>
+                <input type="text" [(ngModel)]="roomCode" placeholder="ROOM CODE" maxlength="6"
+                    style="text-align: center; text-transform: uppercase;">
+                <div class="menu-group">
+                    <button class="btn btn-primary" (click)="joinRoom(false)">JOIN AS CONTROLLER</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Online Multiplayer: 4 options, host can play -->
+        <div class="menu-section">
+            <button class="btn btn-primary" (click)="toggleMenu('online')">ONLINE MULTIPLAYER</button>
+            <div class="sub-menu" [style.display]="activeMenu === 'online' ? 'flex' : 'none'">
+                <div class="menu-group">
+                    <button class="btn btn-secondary" (click)="createRoom('battle', true)">HOST ON KB</button>
+                    <button class="btn btn-secondary" (click)="createRoom('battle', false)">HOST ON PHONE</button>
+                </div>
+                <div class="separator">OR</div>
+                <input type="text" [(ngModel)]="roomCode" placeholder="ROOM CODE" maxlength="6"
+                    style="text-align: center; text-transform: uppercase;">
+                <div class="menu-group">
+                    <button class="btn btn-primary" (click)="joinRoom(true)">JOIN ON KB</button>
+                    <button class="btn btn-primary" (click)="joinRoom(false)">JOIN ON PHONE</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="statusMessage"></div>
+</div>

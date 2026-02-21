@@ -1,0 +1,171 @@
+<div class="game-wrapper" [class.mobile-mode]="isMobile" [class.kb-mode]="isKeyboard"
+    [class.local-controller]="isLocalMode && !isHost" [class.solo-mode]="isSoloMode"
+    [class.local-host-mode]="isLocalMode && isHost">
+    <div class="centered-header" *ngIf="!isMobile">
+        <div id="room-code-display" *ngIf="!(isLocalMode && isHost)">Room Code: <span id="roomCode">{{ roomCode
+                }}</span></div>
+        <div id="game-message">
+            <span class="wait-message" *ngIf="!gameState && !isGameOver && isLocalMode && isHost">Waiting for players to
+                ready...</span>
+            <span *ngIf="!gameState && !isGameOver && !(isLocalMode && isHost)">Waiting for players...</span>
+            <span *ngIf="!gameState && !isGameOver && (isKeyboard || !isMobile) && !(isLocalMode && isHost)"
+                class="ready-hint">Press Enter to ready.</span>
+            <button class="menu-btn" style="width: auto; padding: 5px 20px; font-size: 0.9rem;"
+                *ngIf="!gameState && !isGameOver && !(isLocalMode && isHost)" (click)="ready()">READY UP</button>
+            <span *ngIf="gameState && !isGameOver" class="playing-label">Playing</span>
+            <button class="menu-btn header-menu-btn" *ngIf="gameState && !isGameOver && !(isLocalMode && isHost)"
+                (click)="pause()">MENU</button>
+        </div>
+    </div>
+
+    <!-- Mobile/Local room metadata -->
+    <div id="integrated-metadata" *ngIf="isMobile || (isLocalMode && isHost)">
+        <div id="integrated-room-code">ROOM: <span id="integrated-code-val">{{ roomCode }}</span></div>
+        <div id="player-count-display">PLAYERS: <span id="joined-count">{{ players.length }}</span></div>
+    </div>
+
+    <!-- Local controller: no board, only controls below. Host/local spectator: all boards. Online phone: scores left, my board right. -->
+    <div id="game-container" class="game-container"
+        [class.mobile-boards]="isMobile && !isLocalMode && players.length > 1" *ngIf="!isLocalMode || isHost">
+        <!-- Online phone: scores list on the LEFT -->
+        <div class="mobile-scores-sidebar" *ngIf="isMobile && !isLocalMode && players.length > 1">
+            <div class="mobile-scores-title">SCORES</div>
+            <div *ngFor="let p of players" class="mobile-score-row" [class.my-score]="p.id == myPlayerIndex">
+                <span class="mobile-score-name">{{ p.username }}</span>
+                <span class="mobile-score-val">{{ p.score }}</span>
+            </div>
+        </div>
+        <!-- Board(s): local host sees all; online laptop sees all; online phone sees only my board -->
+        <ng-container *ngFor="let p of players">
+            <div class="player-area" [id]="'player-' + p.id"
+                *ngIf="!isMobile || players.length <= 1 || (p.id == myPlayerIndex)">
+                <h2>{{ p.username }}</h2>
+                <div class="board" [id]="'board-' + p.id">
+                    <ng-container *ngFor="let row of p.board">
+                        <div *ngFor="let cell of row" class="cell" [ngClass]="cell ? 'color-' + cell : ''">
+                        </div>
+                    </ng-container>
+                </div>
+                <div class="score" [id]="'score-' + p.id">{{ p.score }}</div>
+            </div>
+        </ng-container>
+    </div>
+
+    <!-- Local controller: no board message -->
+    <div class="local-controller-message" *ngIf="isLocalMode && !isHost">
+        <p>You are the controller. Use the buttons below. The host screen shows the boards.</p>
+    </div>
+
+    <div id="mobile-controls" class="mobile-controls"
+        *ngIf="isMobile && !isKeyboard && !isGameOver && !showGameEndedByUser">
+        <div class="controls-grid">
+            <!-- Row 1: READY / Playing (red) / RESUME | TRIANGLE | MENU -->
+            <button id="btn-start" class="control-btn sub-btn" type="button"
+                (pointerdown)="ready(); $event.preventDefault()" (click)="$event.preventDefault()"
+                *ngIf="!gameState && !(isLocalMode && isHost)">READY</button>
+            <span class="control-btn sub-btn playing-badge playing-badge-red"
+                *ngIf="gameState && !isPaused && !isGameOver">Playing</span>
+            <button id="btn-resume" class="control-btn sub-btn" (click)="resume()"
+                *ngIf="gameState && isPaused">RESUME</button>
+
+            <button id="btn-rotate" class="control-btn" type="button"
+                (pointerdown)="sendInput('rotate'); $event.preventDefault()" (click)="$event.preventDefault()">
+                <span class="icon triangle">▲</span>
+            </button>
+
+            <button id="btn-menu" class="control-btn sub-btn" type="button" (click)="pause()">MENU</button>
+
+            <!-- Row 2: SQUARE | CROSS | CIRCLE (pointerdown for fast response, prevent click double-fire) -->
+            <button id="btn-left" class="control-btn" type="button"
+                (pointerdown)="sendInput('left'); $event.preventDefault()" (click)="$event.preventDefault()">
+                <span class="icon square">■</span>
+            </button>
+            <button id="btn-down" class="control-btn" type="button"
+                (pointerdown)="sendInput('down'); $event.preventDefault()" (click)="$event.preventDefault()">
+                <span class="icon cross">✖</span>
+            </button>
+            <button id="btn-right" class="control-btn" type="button"
+                (pointerdown)="sendInput('right'); $event.preventDefault()" (click)="$event.preventDefault()">
+                <span class="icon circle">●</span>
+            </button>
+        </div>
+    </div>
+    <div id="pause-overlay" *ngIf="isPaused" style="display: flex;">
+        <h1 class="pause-title">PAUSED</h1>
+        <!-- Leaderboard from MongoDB: only in single player (solo), scrollable -->
+        <div class="pause-leaderboard" *ngIf="isSoloMode">
+            <div class="pause-leaderboard-title">HIGH SCORES</div>
+            <div class="end-scoreboard leaderboard-scroll">
+                <div *ngFor="let s of leaderboard; let i = index" class="score-row">
+                    <span class="rank">#{{ i + 1 }}</span>
+                    <span class="name">{{ s.name }}</span>
+                    <span class="val">{{ s.score }}</span>
+                </div>
+                <p class="leaderboard-loading" *ngIf="!leaderboardLoaded">Loading...</p>
+                <p class="leaderboard-empty" *ngIf="leaderboardLoaded && !leaderboard.length">No scores yet.</p>
+            </div>
+        </div>
+        <button class="menu-btn controls-legend-toggle" (click)="showControlsLegend = !showControlsLegend">
+            {{ showControlsLegend ? 'HIDE CONTROLS' : 'CONTROLS LEGEND' }}
+        </button>
+        <div class="controls-legend" *ngIf="showControlsLegend">
+            <div class="controls-legend-section">
+                <div class="controls-legend-title">KEYBOARD</div>
+                <div class="controls-legend-row"><span class="key">← →</span> Move</div>
+                <div class="controls-legend-row"><span class="key">↓</span> Soft drop</div>
+                <div class="controls-legend-row"><span class="key">↑</span> Rotate</div>
+                <div class="controls-legend-row"><span class="key">Space</span> Hard drop</div>
+                <div class="controls-legend-row"><span class="key">ESC</span> Pause / Menu</div>
+            </div>
+            <div class="controls-legend-section">
+                <div class="controls-legend-title">PHONE (PlayStation style)</div>
+                <div class="controls-legend-row"><span class="icon square">■</span> Move left</div>
+                <div class="controls-legend-row"><span class="icon circle">●</span> Move right</div>
+                <div class="controls-legend-row"><span class="icon cross">✖</span> Soft drop</div>
+                <div class="controls-legend-row"><span class="icon triangle">▲</span> Rotate</div>
+                <div class="controls-legend-row"><span class="key">MENU</span> Pause</div>
+            </div>
+        </div>
+        <div id="pause-menu" class="menu-options">
+            <button id="btn-continue" class="menu-btn" (click)="resume()">CONTINUE</button>
+            <button id="btn-restart" class="menu-btn" (click)="restart()">RESTART</button>
+            <button id="btn-end-game" class="menu-btn logout" (click)="endGameFromMenu()">END GAME</button>
+            <button id="btn-home-menu" class="menu-btn logout" (click)="goHome()">HOME</button>
+        </div>
+    </div>
+
+    <!-- Game ended by user (from menu): show final scores, Home and Replay -->
+    <div id="game-ended-overlay" class="game-over-overlay" *ngIf="showGameEndedByUser">
+        <h1 class="game-ended-title">GAME ENDED</h1>
+        <div class="end-scoreboard">
+            <div *ngFor="let s of gameEndedScores; let i = index" class="score-row">
+                <span class="rank">#{{ i + 1 }}</span>
+                <span class="name">{{ s.name }}</span>
+                <span class="val">{{ s.score }}</span>
+            </div>
+        </div>
+        <div class="menu-options">
+            <button class="menu-btn" (click)="restart()" *ngIf="isHost">REPLAY</button>
+            <button class="menu-btn logout" (click)="goHome()">HOME</button>
+        </div>
+    </div>
+
+    <div id="game-over-overlay" *ngIf="isGameOver"
+        style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); flex-direction: column; justify-content: center; align-items: center; z-index: 1000; color: white; text-align: center;">
+        <h1 style="font-size: 4rem; color: #FFD700; margin: 0;">WINNER!</h1>
+        <h2 style="font-size: 3rem; margin: 10px 0;">{{ winnerName }}</h2>
+
+        <div class="end-scoreboard">
+            <div *ngFor="let s of scores; let i = index" class="score-row">
+                <span class="rank">#{{ i + 1 }}</span>
+                <span class="name">{{ s.name }}</span>
+                <span class="val">{{ s.score }}</span>
+            </div>
+        </div>
+
+        <div class="menu-options">
+            <button id="btn-replay" class="menu-btn" (click)="restart()">REPLAY</button>
+            <button id="btn-end-home" class="menu-btn logout" (click)="goHome()">HOME</button>
+        </div>
+    </div>
+</div>
