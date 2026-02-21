@@ -1,2 +1,14 @@
+# Node dependencies
+node_modules/
+**/node_modules/
+
 # Environment (contains secrets)
 .env
+
+# Angular/Build output
+dist/
+.angular/
+
+# Other
+.history/
+*.log
