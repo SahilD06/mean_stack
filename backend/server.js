@@ -36,8 +36,10 @@ app.get('/api/health', (req, res) => {
 
 // High Scores API (from MongoDB game.score collection)
 app.get('/api/scores', async (req, res) => {
+    console.log('GET /api/scores request received');
     try {
         const highScores = await Score.find().sort({ score: -1 }).limit(50).select('name score').lean();
+        console.log(`Found ${highScores.length} scores`);
         res.json(highScores.map(doc => ({ name: doc.name, score: doc.score })));
     } catch (err) {
         console.error('API /api/scores error:', err);
