@@ -100,6 +100,12 @@ export class GameComponent implements OnInit, OnDestroy {
       this.showGameEndedByUser = false;
     });
 
+    this.socketService.on('highScores').subscribe(data => {
+      console.log('Received updated high scores from server');
+      this.leaderboard = data.map((s: any) => ({ name: s.name ?? 'Anonymous', score: s.score ?? 0 }));
+      this.leaderboardLoaded = true;
+    });
+
     this.socketService.on('roomClosed').subscribe(() => {
       this.router.navigate(['/']);
     });

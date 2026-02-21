@@ -311,6 +311,7 @@ function sendGameState(roomCode) {
 function endGame(roomCode, winnerId) {
     const room = rooms[roomCode];
     if (!room) return;
+    console.log(`Ending game in room ${roomCode}. Winner: ${winnerId}`);
     room.gameState = 'gameover';
     room.intervals.forEach(clearInterval);
     const winner = room.players.find(p => p.id === winnerId);
@@ -320,18 +321,27 @@ function endGame(roomCode, winnerId) {
         scores: room.players.map(p => ({ name: p.username, id: p.id, score: p.instance.score }))
     });
     if (room.mode === 'solo' && room.players[0]) {
+        console.log(`Solo mode detected. Attempting to save score for ${room.players[0].username}: ${room.players[0].instance.score}`);
         saveScore(room.players[0].instance.score, room.players[0].username).then(async () => {
             const highScores = await Score.find().sort({ score: -1 }).limit(10);
+            console.log('Emitting updated highScores to room');
             io.to(roomCode).emit('highScores', highScores);
         });
     }
 }
 
 async function saveScore(score, username) {
+    console.log(`saveScore called with score: ${score}, username: ${username}`);
     if (score > 0) {
         try {
-            await new Score({ score, name: username || 'Anonymous' }).save();
-        } catch (err) { console.error('Error saving score:', err.message); }
+            const newScore = new Score({ score, name: username || 'Anonymous' });
+            await newScore.save();
+            console.log('Score saved successfully to MongoDB:', newScore);
+        } catch (err) {
+            console.error('CRITICAL: Error saving score to MongoDB:', err.message);
+        }
+    } else {
+        console.log('Score is 0, skipping save.');
     }
 }
 
