@@ -1,0 +1,25 @@
+services:
+  # Backend Node.js/Express/Socket.io service
+  - type: web
+    name: project-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false   # Set this manually in the Render dashboard
+
+  # Frontend Angular service (serves static files)
+  - type: web
+    name: mean-stack
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist/frontend
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
