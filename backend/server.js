@@ -501,7 +501,8 @@ async function savePongScore(score, username) {
 }
 
 // Catch-all: serve Angular's index.html for any non-API route (client-side routing)
-app.get('*', (req, res) => {
+// Note: app.get('*') doesn't work in Express 5 — use app.use() instead
+app.use((req, res) => {
     res.sendFile(path.join(angularBuildPath, 'index.html'));
 });
 
