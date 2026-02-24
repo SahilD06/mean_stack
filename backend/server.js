@@ -6,36 +6,22 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
-const cors = require('cors');
 const TetrisGame = require('./tetris');
 const Score = require('./models/Score');
 const PongScore = require('./models/PongScore');
 const PongGame = require('./games/pong');
 const app = express();
-const allowedOrigins = [
-    "https://mean-stack-rcxt.onrender.com",
-    "http://localhost:4200",
-    "http://localhost:3000"
-];
 
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/tetris';
 console.log('MongoDB URI is set:', !!process.env.MONGO_URI);
 
-app.use(cors({
-    origin: allowedOrigins,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-}));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve Angular build — frontend and backend share the same origin, so no CORS needed
+const angularBuildPath = path.join(__dirname, '..', 'frontend', 'dist', 'frontend');
+app.use(express.static(angularBuildPath));
 
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: {
-        origin: allowedOrigins,
-        methods: ["GET", "POST"],
-        credentials: true
-    },
     transports: ['websocket', 'polling'],
     allowEIO3: true
 });
@@ -513,6 +499,11 @@ async function savePongScore(score, username) {
         }
     }
 }
+
+// Catch-all: serve Angular's index.html for any non-API route (client-side routing)
+app.get('*', (req, res) => {
+    res.sendFile(path.join(angularBuildPath, 'index.html'));
+});
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {

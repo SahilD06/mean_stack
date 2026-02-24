@@ -1,4 +1,4 @@
 export const environment = {
     production: true,
-    socketUrl: 'https://project-backend-o8xj.onrender.com'
+    socketUrl: ''   // empty = same origin as the page (backend serves frontend now)
 };
