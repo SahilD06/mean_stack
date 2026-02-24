@@ -12,16 +12,23 @@ const Score = require('./models/Score');
 const PongScore = require('./models/PongScore');
 const PongGame = require('./games/pong');
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: ["https://mean-stack-rcxt.onrender.com", "http://localhost:4200"],
+    methods: ["GET", "POST"],
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+        origin: ["https://mean-stack-rcxt.onrender.com", "http://localhost:4200"],
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling'], // Explicitly allow both
+    allowEIO3: true // For compatibility if needed
 });
 
 // MongoDB Connection
