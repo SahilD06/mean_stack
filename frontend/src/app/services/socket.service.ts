@@ -11,7 +11,9 @@ export class SocketService {
   public baseUrl: string = environment.socketUrl;
 
   constructor() {
-    this.socket = io(this.baseUrl);
+    this.socket = io(this.baseUrl, {
+      transports: ['websocket', 'polling']
+    });
   }
 
   emit(event: string, ...args: any[]) {

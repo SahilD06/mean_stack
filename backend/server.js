@@ -12,10 +12,25 @@ const Score = require('./models/Score');
 const PongScore = require('./models/PongScore');
 const PongGame = require('./games/pong');
 const app = express();
+const allowedOrigins = [
+    "https://mean-stack-rcxt.onrender.com",
+    "http://localhost:4200",
+    "http://localhost:3000"
+];
+
 app.use(cors({
-    origin: ["https://mean-stack-rcxt.onrender.com", "http://localhost:4200"],
-    methods: ["GET", "POST"],
-    credentials: true
+    origin: function (origin, callback) {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            var msg = 'The CORS policy for this site does not ' +
+                'allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -23,12 +38,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: ["https://mean-stack-rcxt.onrender.com", "http://localhost:4200"],
+        origin: allowedOrigins,
         methods: ["GET", "POST"],
         credentials: true
     },
     transports: ['websocket', 'polling'], // Explicitly allow both
-    allowEIO3: true // For compatibility if needed
+    allowEIO3: true
 });
 
 // MongoDB Connection
