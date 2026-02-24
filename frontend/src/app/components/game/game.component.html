@@ -5,16 +5,15 @@
         <div id="room-code-display" *ngIf="!(isLocalMode && isHost)">Room Code: <span id="roomCode">{{ roomCode
                 }}</span></div>
         <div id="game-message">
-            <span class="wait-message" *ngIf="!gameState && !isGameOver && isLocalMode && isHost">Waiting for players to
-                ready...</span>
-            <span *ngIf="!gameState && !isGameOver && !(isLocalMode && isHost)">Waiting for players...</span>
-            <span *ngIf="!gameState && !isGameOver && (isKeyboard || !isMobile) && !(isLocalMode && isHost)"
-                class="ready-hint">Press Enter to ready.</span>
-            <button class="menu-btn" style="width: auto; padding: 5px 20px; font-size: 0.9rem;"
-                *ngIf="!gameState && !isGameOver && !(isLocalMode && isHost)" (click)="ready()">READY UP</button>
-            <span *ngIf="gameState && !isGameOver" class="playing-label">Playing</span>
-            <button class="menu-btn header-menu-btn" *ngIf="gameState && !isGameOver && !(isLocalMode && isHost)"
-                (click)="pause()">MENU</button>
+            <span class="wait-message" *ngIf="showHostWaitMessage">Waiting for players to ready...</span>
+            <span *ngIf="isWaiting && !isHost">Waiting for players...</span>
+            <span class="ready-hint" *ngIf="showReadyHint">Press Enter to ready.</span>
+
+            <button class="menu-btn" style="width: auto; padding: 5px 20px; font-size: 0.9rem;" *ngIf="showReadyButton"
+                (click)="ready()">READY UP</button>
+
+            <span *ngIf="isPlaying" class="playing-label">Playing</span>
+            <button class="menu-btn header-menu-btn" *ngIf="isPlaying && !isHost" (click)="pause()">MENU</button>
         </div>
     </div>
 
@@ -27,8 +26,23 @@
     <!-- Local controller: no board, only controls below. Host/local spectator: all boards. Online phone: scores left, my board right. -->
     <div id="game-container" class="game-container"
         [class.mobile-boards]="isMobile && !isLocalMode && players.length > 1" *ngIf="!isLocalMode || isHost">
+
+        <!-- PONG ARENA -->
+        <div class="pong-arena-wrapper" *ngIf="isPongMode">
+            <canvas id="pongCanvas" #pongCanvas width="800" height="500"></canvas>
+            <div class="pong-score-overlay">
+                <div class="side-score left">
+                    <div class="lives-display" *ngIf="isSoloMode">
+                        <span *ngFor="let h of [].constructor(pongState?.lives || 0)">❤️</span>
+                    </div>
+                    {{ pongState?.players[0]?.score || 0 }}
+                </div>
+                <div class="side-score right" *ngIf="!isSoloMode">{{ pongState?.players[1]?.score || 0 }}</div>
+            </div>
+        </div>
+
         <!-- Online phone: scores list on the LEFT -->
-        <div class="mobile-scores-sidebar" *ngIf="isMobile && !isLocalMode && players.length > 1">
+        <div class="mobile-scores-sidebar" *ngIf="isMobile && !isLocalMode && players.length > 1 && !isPongMode">
             <div class="mobile-scores-title">SCORES</div>
             <div *ngFor="let p of players" class="mobile-score-row" [class.my-score]="p.id == myPlayerIndex">
                 <span class="mobile-score-name">{{ p.username }}</span>
@@ -38,7 +52,7 @@
         <!-- Board(s): local host sees all; online laptop sees all; online phone sees only my board -->
         <ng-container *ngFor="let p of players">
             <div class="player-area" [id]="'player-' + p.id"
-                *ngIf="!isMobile || players.length <= 1 || (p.id == myPlayerIndex)">
+                *ngIf="(!isMobile || players.length <= 1 || (p.id == myPlayerIndex)) && !isPongMode">
                 <h2>{{ p.username }}</h2>
                 <div class="board" [id]="'board-' + p.id">
                     <ng-container *ngFor="let row of p.board">
@@ -53,39 +67,45 @@
 
     <!-- Local controller: no board message -->
     <div class="local-controller-message" *ngIf="isLocalMode && !isHost">
-        <p>You are the controller. Use the buttons below. The host screen shows the boards.</p>
+        <p>You are the controller. Use the buttons below. The host screen shows the board.</p>
     </div>
 
     <div id="mobile-controls" class="mobile-controls"
         *ngIf="isMobile && !isKeyboard && !isGameOver && !showGameEndedByUser">
         <div class="controls-grid">
             <!-- Row 1: READY / Playing (red) / RESUME | TRIANGLE | MENU -->
+            <!-- Row 1: READY / Playing / RESUME -->
             <button id="btn-start" class="control-btn sub-btn" type="button"
                 (pointerdown)="ready(); $event.preventDefault()" (click)="$event.preventDefault()"
-                *ngIf="!gameState && !(isLocalMode && isHost)">READY</button>
+                *ngIf="showReadyButton">READY</button>
             <span class="control-btn sub-btn playing-badge playing-badge-red"
-                *ngIf="gameState && !isPaused && !isGameOver">Playing</span>
+                *ngIf="isPlaying && !isPaused">Playing</span>
             <button id="btn-resume" class="control-btn sub-btn" (click)="resume()"
-                *ngIf="gameState && isPaused">RESUME</button>
+                *ngIf="isPlaying && isPaused">RESUME</button>
 
+            <!-- ROTATE (Triangle) / UP for Pong -->
             <button id="btn-rotate" class="control-btn" type="button"
-                (pointerdown)="sendInput('rotate'); $event.preventDefault()" (click)="$event.preventDefault()">
+                (pointerdown)="sendInput('up', true); $event.preventDefault()"
+                (pointerup)="sendInput('up', false); $event.preventDefault()" (click)="$event.preventDefault()">
                 <span class="icon triangle">▲</span>
             </button>
 
             <button id="btn-menu" class="control-btn sub-btn" type="button" (click)="pause()">MENU</button>
 
-            <!-- Row 2: SQUARE | CROSS | CIRCLE (pointerdown for fast response, prevent click double-fire) -->
+            <!-- Row 2: SQUARE | CROSS | CIRCLE -->
             <button id="btn-left" class="control-btn" type="button"
-                (pointerdown)="sendInput('left'); $event.preventDefault()" (click)="$event.preventDefault()">
+                (pointerdown)="sendInput('left', true); $event.preventDefault()"
+                (pointerup)="sendInput('left', false); $event.preventDefault()" (click)="$event.preventDefault()">
                 <span class="icon square">■</span>
             </button>
             <button id="btn-down" class="control-btn" type="button"
-                (pointerdown)="sendInput('down'); $event.preventDefault()" (click)="$event.preventDefault()">
+                (pointerdown)="sendInput('down', true); $event.preventDefault()"
+                (pointerup)="sendInput('down', false); $event.preventDefault()" (click)="$event.preventDefault()">
                 <span class="icon cross">✖</span>
             </button>
             <button id="btn-right" class="control-btn" type="button"
-                (pointerdown)="sendInput('right'); $event.preventDefault()" (click)="$event.preventDefault()">
+                (pointerdown)="sendInput('right', true); $event.preventDefault()"
+                (pointerup)="sendInput('right', false); $event.preventDefault()" (click)="$event.preventDefault()">
                 <span class="icon circle">●</span>
             </button>
         </div>
@@ -117,7 +137,7 @@
                 <div class="controls-legend-row"><span class="key">Space</span> Hard drop</div>
                 <div class="controls-legend-row"><span class="key">ESC</span> Pause / Menu</div>
             </div>
-            <div class="controls-legend-section">
+            <div class="controls-legend-section" *ngIf="!isPongMode">
                 <div class="controls-legend-title">PHONE (PlayStation style)</div>
                 <div class="controls-legend-row"><span class="icon square">■</span> Move left</div>
                 <div class="controls-legend-row"><span class="icon circle">●</span> Move right</div>
@@ -125,10 +145,23 @@
                 <div class="controls-legend-row"><span class="icon triangle">▲</span> Rotate</div>
                 <div class="controls-legend-row"><span class="key">MENU</span> Pause</div>
             </div>
+            <div class="controls-legend-section" *ngIf="isPongMode">
+                <div class="controls-legend-title">KEYBOARD (Pong)</div>
+                <div class="controls-legend-row"><span class="key">W / ↑</span> Move Up</div>
+                <div class="controls-legend-row"><span class="key">S / ↓</span> Move Down</div>
+                <div class="controls-legend-row"><span class="key">ESC</span> Pause / Menu</div>
+            </div>
+            <div class="controls-legend-section" *ngIf="isPongMode">
+                <div class="controls-legend-title">PHONE (Pong)</div>
+                <div class="controls-legend-row"><span class="icon triangle">▲</span> Move Up</div>
+                <div class="controls-legend-row"><span class="icon cross">✖</span> Move Down</div>
+                <div class="controls-legend-row"><span class="key">MENU</span> Pause</div>
+            </div>
         </div>
         <div id="pause-menu" class="menu-options">
             <button id="btn-continue" class="menu-btn" (click)="resume()">CONTINUE</button>
-            <button id="btn-restart" class="menu-btn" (click)="restart()">RESTART</button>
+            <button id="btn-restart" class="menu-btn" (click)="restart()"
+                *ngIf="isSoloMode || isLocalMode">RESTART</button>
             <button id="btn-end-game" class="menu-btn logout" (click)="endGameFromMenu()">END GAME</button>
             <button id="btn-home-menu" class="menu-btn logout" (click)="goHome()">HOME</button>
         </div>

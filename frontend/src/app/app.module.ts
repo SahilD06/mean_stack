@@ -7,12 +7,16 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { HomeComponent } from './components/home/home.component';
 import { GameComponent } from './components/game/game.component';
+import { LandingComponent } from './components/landing/landing.component';
+import { PongHomeComponent } from './components/pong-home/pong-home.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     HomeComponent,
-    GameComponent
+    GameComponent,
+    LandingComponent,
+    PongHomeComponent
   ],
   imports: [
     BrowserModule,

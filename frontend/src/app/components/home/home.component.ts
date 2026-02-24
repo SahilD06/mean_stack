@@ -52,4 +52,8 @@ export class HomeComponent implements OnInit {
       this.socketService.emit('joinRoom', this.roomCode, this.username);
     }
   }
+
+  goBack() {
+    this.router.navigate(['/']);
+  }
 }

@@ -158,6 +158,68 @@
     margin-top: 80px;
 }
 
+/* Pong Specific Styles */
+.pong-arena-wrapper {
+    position: relative;
+    width: 800px;
+    height: 500px;
+    max-width: 95vw;
+    max-height: 60vh;
+    aspect-ratio: 800 / 500;
+}
+
+#pongCanvas {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+    display: block;
+}
+
+.pong-score-overlay {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.side-score {
+    font-size: 3rem;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.lives-display {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 5px;
+    font-size: 1.2rem;
+    filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.5));
+    animation: heartBeat 2s infinite ease-in-out;
+}
+
+@keyframes heartBeat {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+}
+
 .player-area {
     background: rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(10px);
@@ -324,6 +386,15 @@
     padding-bottom: 200px;
     min-height: 100vh;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.game-wrapper.mobile-mode .pong-arena-wrapper {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    flex-shrink: 0;
 }
 
 .game-wrapper.mobile-mode #game-container {
@@ -589,14 +660,6 @@
 }
 
 /* --- SINGLE PLAYER (PHONE) STYLE --- */
-.solo-mode #integrated-room-code {
-    /* Add specific styles for phone here */
-}
-
-.solo-mode #player-count-display {
-    /* Add specific styles for phone here */
-}
-
 /* --- LOCAL HOST STYLE --- */
 .local-host-mode .wait-message,
 .local-host-mode .playing-label {

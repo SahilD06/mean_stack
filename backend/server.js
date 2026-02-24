@@ -9,10 +9,12 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const TetrisGame = require('./tetris');
 const Score = require('./models/Score');
-
+const PongScore = require('./models/PongScore');
+const PongGame = require('./games/pong');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -47,6 +49,19 @@ app.get('/api/scores', async (req, res) => {
     }
 });
 
+// High Scores API (Pong)
+app.get('/api/pong-scores', async (req, res) => {
+    console.log('GET /api/pong-scores request received');
+    try {
+        const highScores = await PongScore.find().sort({ score: -1 }).limit(50).select('name score').lean();
+        console.log(`Found ${highScores.length} pong scores`);
+        res.json(highScores.map(doc => ({ name: doc.name, score: doc.score })));
+    } catch (err) {
+        console.error('API /api/pong-scores error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Game State
 let rooms = {};
 const TICK_RATE = 1000;
@@ -69,70 +84,76 @@ io.on('connection', (socket) => {
         socket.join(roomCode);
         socket.emit('roomCreated', roomCode);
 
-        /* Solo: host is the only player. Local: host is spectator (no player). Battle: host can play. */
-        if (mode === 'solo') {
-            rooms[roomCode].playerCounter++;
-            const playerIndex = rooms[roomCode].playerCounter;
-            rooms[roomCode].players.push({
-                id: playerIndex,
-                socketId: socket.id,
-                instance: new TetrisGame(),
-                username: username || 'Anonymous'
-            });
-            socket.emit('playerJoined', { playerIndex, username: username || 'Anonymous' });
-        } else if (mode === 'local') {
-            /* Host does not get a player slot; they only display boards */
-        } else if (integrated) {
-            rooms[roomCode].playerCounter++;
-            const playerIndex = rooms[roomCode].playerCounter;
-            rooms[roomCode].players.push({
-                id: playerIndex,
-                socketId: socket.id,
-                instance: new TetrisGame(),
-                username: username || 'Anonymous'
-            });
-            socket.emit('playerJoined', { playerIndex, username: username || 'Anonymous' });
+        // Pong initialization
+        if (mode.startsWith('pong_')) {
+            rooms[roomCode].pong = new PongGame(io, roomCode, mode, (data) => handlePongGameOver(roomCode, data));
+            if (mode === 'pong_solo' || (mode === 'pong_battle' && integrated)) {
+                addPlayerToRoom(roomCode, socket.id, username);
+            }
+        } else {
+            // Tetris initialization (Solo or Integrated Battle)
+            if (mode === 'solo' || integrated) {
+                addPlayerToRoom(roomCode, socket.id, username);
+                socket.emit('playerJoined', { playerIndex: rooms[roomCode].playerCounter, username: username || 'Anonymous' });
+            }
         }
         broadcastRoomStats(roomCode);
     });
 
     socket.on('joinRoom', (roomCode, username) => {
         const room = rooms[roomCode];
-        if (!room) {
-            socket.emit('error', 'Room not found');
-            return;
-        }
-        if (room.gameState === 'waiting') {
-            if (room.mode === 'solo') {
-                socket.join(roomCode);
-                socket.emit('joinedRoom', { roomCode, playerIndex: 1, mode: room.mode });
-                return;
-            }
-            /* local and battle: allow multiple players */
-            if (room.players.length < 7) {
-                room.playerCounter++;
-                const playerIndex = room.playerCounter;
-                room.players.push({
-                    id: playerIndex,
-                    socketId: socket.id,
-                    instance: new TetrisGame(),
-                    username: username || `Player ${playerIndex}`
-                });
-                socket.join(roomCode);
-                socket.emit('joinedRoom', { roomCode, playerIndex, currentPlayers: room.players.map(p => p.id), mode: room.mode });
-                io.to(roomCode).emit('playerJoined', { playerIndex, username: username || `Player ${playerIndex}` });
-            } else {
-                socket.emit('error', 'Room is full');
-            }
-            broadcastRoomStats(roomCode);
+        if (!room) return socket.emit('error', 'Room not found');
+        if (room.gameState !== 'waiting' && !room.mode.startsWith('pong_')) return socket.emit('error', 'Game already started');
+
+        const playerCount = room.players.length;
+        if (room.mode.startsWith('pong_')) {
+            if (playerCount >= 2) return socket.emit('error', 'Pong room is full');
+            addPlayerToRoom(roomCode, socket.id, username);
+            socket.join(roomCode);
+            socket.emit('joinedRoom', { roomCode, playerIndex: room.playerCounter, mode: room.mode });
+            io.to(roomCode).emit('playerJoined', { playerIndex: room.playerCounter, username: username || `P${room.playerCounter}` });
+        } else if (room.mode === 'solo') {
+            socket.join(roomCode);
+            socket.emit('joinedRoom', { roomCode, playerIndex: 1, mode: room.mode });
+        } else if (playerCount < 7) {
+            addPlayerToRoom(roomCode, socket.id, username);
+            socket.join(roomCode);
+            socket.emit('joinedRoom', { roomCode, playerIndex: room.playerCounter, currentPlayers: room.players.map(p => p.id), mode: room.mode });
+            io.to(roomCode).emit('playerJoined', { playerIndex: room.playerCounter, username: username || `Player ${room.playerCounter}` });
         } else {
-            socket.emit('error', 'Game already started');
+            socket.emit('error', 'Room is full');
         }
+        broadcastRoomStats(roomCode);
     });
 
     socket.on('playerReady', (roomCode) => {
         const room = rooms[roomCode];
-        if (room && (room.gameState === 'waiting' || room.gameState === 'gameover')) {
+        if (!room) return;
+
+        if (room.mode.startsWith('pong_')) {
+            room.readyPlayers.add(socket.id);
+            const needed = room.mode === 'pong_solo' ? 1 : Math.min(2, room.players.length);
+            if (room.readyPlayers.size >= needed && room.players.length >= (room.mode === 'pong_solo' ? 1 : 2)) {
+                room.gameState = 'playing';
+                room.pong.start();
+                io.to(roomCode).emit('pongStarted');
+
+                // Emit high scores for solo mode
+                if (room.mode === 'pong_solo') {
+                    PongScore.find().sort({ score: -1 }).limit(10).then(scores => {
+                        io.to(roomCode).emit('highScores', scores);
+                    });
+                }
+            }
+            io.to(roomCode).emit('playerReadyStatus', {
+                socketId: socket.id,
+                readyCount: room.readyPlayers.size,
+                totalPlayers: room.mode === 'pong_solo' ? 1 : 2
+            });
+            return;
+        }
+
+        if (room.gameState === 'waiting' || room.gameState === 'gameover') {
             room.readyPlayers.add(socket.id);
             if (room.mode === 'solo' || room.readyPlayers.size === room.players.length) {
                 startGame(roomCode);
@@ -148,6 +169,8 @@ io.on('connection', (socket) => {
     socket.on('input', ({ roomCode, action }) => {
         const room = rooms[roomCode];
         if (room && room.gameState === 'playing' && !room.paused) {
+            if (room.mode.startsWith('pong_')) return; // Pong uses pongInput
+
             const player = room.mode === 'solo' ? room.players[0] : room.players.find(p => p.socketId === socket.id);
             if (player) {
                 const game = player.instance;
@@ -164,26 +187,70 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('pongInput', ({ roomCode, type, pressed }) => {
+        const room = rooms[roomCode];
+        if (room && room.pong && room.gameState === 'playing' && !room.paused) {
+            room.pong.handleInput(socket.id, { type, pressed });
+        }
+    });
+
     socket.on('pauseGame', (roomCode) => {
         const room = rooms[roomCode];
         if (room) {
             room.paused = true;
+            if (room.pong) room.pong.paused = true;
             io.to(roomCode).emit('gamePaused');
+
+            // Emit high scores on pause for solo mode
+            if (room.mode === 'solo' || room.mode === 'pong_solo') {
+                const Model = room.mode === 'pong_solo' ? PongScore : Score;
+                Model.find().sort({ score: -1 }).limit(10).then(scores => {
+                    io.to(roomCode).emit('highScores', scores);
+                });
+            }
         }
     });
 
     socket.on('unpauseGame', (roomCode) => {
         const room = rooms[roomCode];
-        if (room && room.gameState === 'playing') {
+        if (room) {
             room.paused = false;
+            if (room.pong) {
+                room.pong.paused = false;
+            } else if (room.gameState === 'playing') {
+                sendGameState(roomCode);
+            }
             io.to(roomCode).emit('gameUnpaused');
-            sendGameState(roomCode);
         }
     });
 
     socket.on('endGameManual', (roomCode) => {
         const room = rooms[roomCode];
         if (room && room.gameState === 'playing') {
+            if (room.mode.startsWith('pong_')) {
+                // Find player with highest score
+                const players = Object.values(room.pong.players);
+                let winner = players[0];
+                players.forEach(p => {
+                    if (p.score > winner.score) winner = p;
+                });
+
+                room.gameState = 'gameover';
+                room.pong.gameOver = true;
+                const endGameData = { winnerId: winner.id, side: winner.side };
+                io.to(roomCode).emit('pongGameOver', endGameData);
+
+                // Save score for solo mode
+                if (room.mode === 'pong_solo') {
+                    const pongPlayer = room.pong.players[winner.socketId];
+                    const finalScore = pongPlayer ? pongPlayer.score : winner.score;
+                    savePongScore(finalScore, winner.username).then(async () => {
+                        const highScores = await PongScore.find().sort({ score: -1 }).limit(10);
+                        io.to(roomCode).emit('highScores', highScores);
+                    });
+                }
+                return;
+            }
             const player = room.players.find(p => p.socketId === socket.id);
             if (player) {
                 console.log(`Manual end game requested by ${player.username} in room ${roomCode}`);
@@ -198,6 +265,7 @@ io.on('connection', (socket) => {
         if (room.hostId === socket.id) {
             io.to(roomCode).emit('roomClosed');
             room.intervals.forEach(clearInterval);
+            if (room.pong) room.pong.destroy();
             delete rooms[roomCode];
             return;
         }
@@ -222,17 +290,35 @@ io.on('connection', (socket) => {
 
     socket.on('restartGame', (roomCode) => {
         const room = rooms[roomCode];
-        if (!room || room.hostId !== socket.id) return;
+        if (!room) return;
+
+        // Allow host to restart, OR anyone if it's local/solo mode
+        const isHost = room.hostId === socket.id;
+        const isLocalOrSolo = room.mode === 'solo' || room.mode === 'local' || room.mode === 'pong_solo' || room.mode === 'pong_local';
+
+        if (!isHost && !isLocalOrSolo) return;
+
         room.gameState = 'waiting';
         room.readyPlayers.clear();
         room.intervals.forEach(clearInterval);
         room.intervals = [];
         room.paused = false;
-        room.players.forEach(p => p.instance = new TetrisGame());
+
+        if (room.mode.startsWith('pong_')) {
+            if (room.pong) room.pong.destroy();
+            room.pong = new PongGame(io, roomCode, room.mode);
+            // Re-add players to the new instance to reset paddles and scores
+            room.players.forEach((p, idx) => {
+                const side = idx === 0 ? 'left' : 'right';
+                room.pong.addPlayer(p.socketId, side, p.username);
+            });
+        } else {
+            room.players.forEach(p => p.instance = new TetrisGame());
+        }
+
         io.to(roomCode).emit('gameRestarted');
         broadcastRoomStats(roomCode);
     });
-
     socket.on('disconnect', () => {
         for (const [code, room] of Object.entries(rooms)) {
             if (room.hostId === socket.id) {
@@ -258,7 +344,9 @@ io.on('connection', (socket) => {
             }
         }
     });
+
 });
+
 
 function broadcastRoomStats(roomCode) {
     const room = rooms[roomCode];
@@ -310,13 +398,17 @@ function sendGameState(roomCode) {
     if (!room) return;
     const payload = {};
     room.players.forEach(p => {
-        payload[`p${p.id}`] = {
-            board: p.instance.getRenderBoard(),
-            score: p.instance.score,
-            username: p.username
-        };
+        if (p.instance) {
+            payload[`p${p.id}`] = {
+                board: p.instance.getRenderBoard(),
+                score: p.instance.score,
+                username: p.username
+            };
+        }
     });
-    io.to(roomCode).emit('gameState', payload);
+    if (Object.keys(payload).length > 0) {
+        io.to(roomCode).emit('gameState', payload);
+    }
 }
 
 function endGame(roomCode, winnerId) {
@@ -353,6 +445,56 @@ async function saveScore(score, username) {
         }
     } else {
         console.log('Score is 0, skipping save.');
+    }
+}
+
+function addPlayerToRoom(roomCode, socketId, username) {
+    const room = rooms[roomCode];
+    if (!room) return;
+    room.playerCounter++;
+    const player = {
+        id: room.playerCounter,
+        socketId: socketId,
+        username: username || (room.mode.startsWith('pong_') ? `P${room.playerCounter}` : `Player ${room.playerCounter}`)
+    };
+    if (!room.mode.startsWith('pong_')) {
+        player.instance = new TetrisGame();
+    }
+    room.players.push(player);
+    if (room.pong) {
+        const side = room.players.length === 1 ? 'left' : 'right';
+        room.pong.addPlayer(socketId, side, player.username);
+    }
+    return player;
+}
+
+async function handlePongGameOver(roomCode, data) {
+    const room = rooms[roomCode];
+    if (!room || !room.pong) return;
+
+    if (room.mode === 'pong_solo') {
+        const player = room.players[0]; // In solo, there's only one player
+        if (player) {
+            // Get score from PongGame instance
+            const pongPlayer = room.pong.players[player.socketId];
+            const score = pongPlayer ? pongPlayer.score : 0;
+
+            await savePongScore(score, player.username);
+            const highScores = await PongScore.find().sort({ score: -1 }).limit(10);
+            io.to(roomCode).emit('highScores', highScores);
+        }
+    }
+}
+
+async function savePongScore(score, username) {
+    if (score > 0) {
+        try {
+            const newScore = new PongScore({ score, name: username || 'Anonymous' });
+            await newScore.save();
+            console.log('Pong Score saved successfully:', newScore);
+        } catch (err) {
+            console.error('Error saving pong score:', err.message);
+        }
     }
 }
 

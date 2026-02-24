@@ -1,13 +1,14 @@
 import { Injectable } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class SocketService {
   private socket: Socket;
-  public baseUrl: string = 'https://project-backend-o8xj.onrender.com';
+  public baseUrl: string = environment.socketUrl;
 
   constructor() {
     this.socket = io(this.baseUrl);
@@ -20,9 +21,11 @@ export class SocketService {
 
   on(event: string): Observable<any> {
     return new Observable(observer => {
-      this.socket.on(event, (data) => {
-        observer.next(data);
-      });
+      const handler = (data: any) => observer.next(data);
+      this.socket.on(event, handler);
+      return () => {
+        this.socket.off(event, handler);
+      };
     });
   }
 
