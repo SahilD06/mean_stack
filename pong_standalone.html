@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong Standalone</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        canvas {
+            border: 4px solid #fff;
+            background-color: #000;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        .score-container {
+            display: flex;
+            justify-content: space-between;
+            width: 800px;
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .controls-hint {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #888;
+            text-align: center;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            display: none;
+        }
+
+        #overlay h1 {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        #overlay p {
+            font-size: 24px;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="score-container">
+        <div id="leftScore">0</div>
+        <div id="rightScore">0</div>
+    </div>
+
+    <canvas id="pongCanvas" width="800" height="500"></canvas>
+
+    <div class="controls-hint">
+        Player 1: W/S | Player 2: Arrows<br>
+        First to 10 wins!
+    </div>
+
+    <div id="overlay">
+        <h1 id="winnerMsg">PLAYER 1 WINS</h1>
+        <p>Press Space to Restart</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        const leftScoreEl = document.getElementById('leftScore');
+        const rightScoreEl = document.getElementById('rightScore');
+        const overlay = document.getElementById('overlay');
+        const winnerMsg = document.getElementById('winnerMsg');
+
+        // Game Constants
+        const PADDLE_WIDTH = 10;
+        const PADDLE_HEIGHT = 80;
+        const BALL_SIZE = 8;
+        const INITIAL_BALL_SPEED = 4;
+        const SPEED_INCREMENT = 1.1;
+        const WINNING_SCORE = 10;
+
+        // Game State
+        let leftPaddleY = canvas.height / 2 - PADDLE_HEIGHT / 2;
+        let rightPaddleY = canvas.height / 2 - PADDLE_HEIGHT / 2;
+        let ballX = canvas.height / 2;
+        let ballY = canvas.width / 2;
+        let ballSpeedX = INITIAL_BALL_SPEED;
+        let ballSpeedY = INITIAL_BALL_SPEED;
+        let leftScore = 0;
+        let rightScore = 0;
+        let gameActive = true;
+
+        // Input Handling
+        const keys = {};
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function resetBall() {
+            ballX = canvas.width / 2;
+            ballY = canvas.height / 2;
+            ballSpeedX = INITIAL_BALL_SPEED * (Math.random() > 0.5 ? 1 : -1);
+            ballSpeedY = INITIAL_BALL_SPEED * (Math.random() > 0.5 ? 1 : -1);
+        }
+
+        function resetGame() {
+            leftScore = 0;
+            rightScore = 0;
+            leftScoreEl.textContent = '0';
+            rightScoreEl.textContent = '0';
+            gameActive = true;
+            overlay.style.display = 'none';
+            resetBall();
+            update();
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            // Move Paddles
+            if (keys['KeyW'] && leftPaddleY > 0) leftPaddleY -= 6;
+            if (keys['KeyS'] && leftPaddleY < canvas.height - PADDLE_HEIGHT) leftPaddleY += 6;
+            if (keys['ArrowUp'] && rightPaddleY > 0) rightPaddleY -= 6;
+            if (keys['ArrowDown'] && rightPaddleY < canvas.height - PADDLE_HEIGHT) rightPaddleY += 6;
+
+            // Move Ball
+            ballX += ballSpeedX;
+            ballY += ballSpeedY;
+
+            // Wall Collisions
+            if (ballY < 0 || ballY > canvas.height - BALL_SIZE) {
+                ballSpeedY = -ballSpeedY;
+            }
+
+            // Paddle Collisions
+            if (ballX < PADDLE_WIDTH) {
+                if (ballY > leftPaddleY && ballY < leftPaddleY + PADDLE_HEIGHT) {
+                    ballSpeedX = -ballSpeedX * SPEED_INCREMENT;
+                    ballX = PADDLE_WIDTH; // Prevent sticking
+                } else if (ballX < 0) {
+                    rightScore++;
+                    rightScoreEl.textContent = rightScore;
+                    checkGameOver();
+                    resetBall();
+                }
+            }
+
+            if (ballX > canvas.width - PADDLE_WIDTH - BALL_SIZE) {
+                if (ballY > rightPaddleY && ballY < rightPaddleY + PADDLE_HEIGHT) {
+                    ballSpeedX = -ballSpeedX * SPEED_INCREMENT;
+                    ballX = canvas.width - PADDLE_WIDTH - BALL_SIZE; // Prevent sticking
+                } else if (ballX > canvas.width) {
+                    leftScore++;
+                    leftScoreEl.textContent = leftScore;
+                    checkGameOver();
+                    resetBall();
+                }
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function checkGameOver() {
+            if (leftScore >= WINNING_SCORE || rightScore >= WINNING_SCORE) {
+                gameActive = false;
+                overlay.style.display = 'flex';
+                winnerMsg.textContent = leftScore >= WINNING_SCORE ? 'PLAYER 1 WINS' : 'PLAYER 2 WINS';
+            }
+        }
+
+        function draw() {
+            // Background
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Center Line
+            ctx.setLineDash([10, 10]);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Paddles
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, leftPaddleY, PADDLE_WIDTH, PADDLE_HEIGHT);
+            ctx.fillRect(canvas.width - PADDLE_WIDTH, rightPaddleY, PADDLE_WIDTH, PADDLE_HEIGHT);
+
+            // Ball
+            ctx.fillRect(ballX, ballY, BALL_SIZE, BALL_SIZE);
+        }
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space' && !gameActive) {
+                resetGame();
+            }
+        });
+
+        resetBall();
+        update();
+    </script>
+</body>
+
+</html>

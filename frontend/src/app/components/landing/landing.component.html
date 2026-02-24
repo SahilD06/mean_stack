@@ -1,0 +1,35 @@
+<div class="landing-container">
+    <div class="overlay"></div>
+    <header>
+        <h1>ULTIMATE BATTLE ARENA</h1>
+        <p>Select your challenge and enter the fight</p>
+    </header>
+
+    <div class="game-cards">
+        <!-- Tetris card -->
+        <div class="game-card tetris" (click)="selectGame('tetris')">
+            <div class="card-content">
+                <div class="game-icon">🧊</div>
+                <h2>TETRIS BATTLE</h2>
+                <p>Classic block-stacking action. Build, clear, and survive.</p>
+                <button class="btn-play">SELECT TETRIS</button>
+            </div>
+            <div class="card-bg"></div>
+        </div>
+
+        <!-- Pong card -->
+        <div class="game-card pong" (click)="selectGame('pong')">
+            <div class="card-content">
+                <div class="game-icon">🏓</div>
+                <h2>PONG ARENA</h2>
+                <p>Ultra-fast paddle combat. Break the walls and score big.</p>
+                <button class="btn-play">SELECT PONG</button>
+            </div>
+            <div class="card-bg"></div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Multiplayer • Local Controller Support • Online PvP</p>
+    </footer>
+</div>
