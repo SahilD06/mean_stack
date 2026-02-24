@@ -12,8 +12,7 @@ export class SocketService {
 
   constructor() {
     this.socket = io(this.baseUrl, {
-      transports: ['polling'],  // Force polling only — Render blocks WebSocket upgrades on free tier
-      upgrade: false            // Prevent Socket.io from attempting a WebSocket upgrade
+      transports: ['websocket', 'polling']  // websocket first = low latency; polling as fallback
     });
 
     this.socket.on('connect', () => {
