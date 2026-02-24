@@ -14,6 +14,16 @@ export class SocketService {
     this.socket = io(this.baseUrl, {
       transports: ['websocket', 'polling']
     });
+
+    this.socket.on('connect', () => {
+      console.log('Socket connected successfully with ID:', this.socket.id);
+    });
+
+    this.socket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err.message);
+      // If websocket fails, it usually falls back to polling automatically
+      // but we can log specifically what failed.
+    });
   }
 
   emit(event: string, ...args: any[]) {

@@ -18,17 +18,11 @@ const allowedOrigins = [
     "http://localhost:3000"
 ];
 
+const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/tetris';
+console.log('MongoDB URI is set:', !!process.env.MONGO_URI);
+
 app.use(cors({
-    origin: function (origin, callback) {
-        // allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            var msg = 'The CORS policy for this site does not ' +
-                'allow access from the specified Origin.';
-            return callback(new Error(msg), false);
-        }
-        return callback(null, true);
-    },
+    origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 }));
@@ -42,12 +36,12 @@ const io = new Server(server, {
         methods: ["GET", "POST"],
         credentials: true
     },
-    transports: ['websocket', 'polling'], // Explicitly allow both
+    transports: ['websocket', 'polling'],
     allowEIO3: true
 });
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/tetris', {
+mongoose.connect(mongoUri, {
     dbName: 'game',
     serverSelectionTimeoutMS: 5000
 }).then(() => console.log('MongoDB Connected'))
