@@ -12,17 +12,16 @@ export class SocketService {
 
   constructor() {
     this.socket = io(this.baseUrl, {
-      transports: ['websocket', 'polling']
+      transports: ['polling'],  // Force polling only — Render blocks WebSocket upgrades on free tier
+      upgrade: false            // Prevent Socket.io from attempting a WebSocket upgrade
     });
 
     this.socket.on('connect', () => {
-      console.log('Socket connected successfully with ID:', this.socket.id);
+      console.log('Socket connected via polling, ID:', this.socket.id);
     });
 
     this.socket.on('connect_error', (err) => {
       console.error('Socket connection error:', err.message);
-      // If websocket fails, it usually falls back to polling automatically
-      // but we can log specifically what failed.
     });
   }
 
