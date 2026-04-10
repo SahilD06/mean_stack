@@ -14,7 +14,6 @@
             </div>
         </div>
 
-        <!-- Local Multiplayer: host displays all boards, no play; only controllers join -->
         <div class="menu-section">
             <button class="btn btn-primary" (click)="toggleMenu('local')">LOCAL MULTIPLAYER</button>
             <div class="sub-menu" [style.display]="activeMenu === 'local' ? 'flex' : 'none'">
@@ -31,7 +30,6 @@
             </div>
         </div>
 
-        <!-- Online Multiplayer: 4 options, host can play -->
         <div class="menu-section">
             <button class="btn btn-primary" (click)="toggleMenu('online')">ONLINE MULTIPLAYER</button>
             <div class="sub-menu" [style.display]="activeMenu === 'online' ? 'flex' : 'none'">
